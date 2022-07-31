@@ -8,6 +8,10 @@ function doPost(e) {
     case "おやすみ":
       recordLeaving(userName);
       break;
+    case "休憩":
+    case "再開":
+      recordBreaking(userName);
+      break;
     default:
       return;
   }
@@ -17,6 +21,8 @@ const columnNumber = new Map([
   ["日付", 1],
   ["出勤時間", 3],
   ["退勤時間", 4],
+  ["休憩時間", 5],
+  ["最後の休憩時間", 9],
 ]);
 
 function recordAttendance(userName) {
@@ -94,4 +100,83 @@ function recordLeaving(userName) {
     .padStart(2, "0")}`;
 
   newCellOfLeavingTime.setValue(timeString);
+}
+
+function recordBreaking(userName) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(userName);
+
+  // 現在時刻から日付セルと開始時刻セルに記録する文字列を生成
+  const date = new Date();
+  const dateString = `${date.getFullYear()}/${
+    date.getMonth() + 1
+  }/${date.getDate()}`;
+  Logger.log(`dateString: ${dateString}`);
+  const timeString = `${date.getHours().toString().padStart(2, "0")}:${date
+    .getMinutes()
+    .toString()
+    .padStart(2, "0")}`;
+  Logger.log(`timeString: ${timeString}`);
+
+  // 開始時刻が記録されている最新のセルを特定
+  const topCellOfAttendanceTime = sheet.getRange(
+    1,
+    columnNumber.get("出勤時間")
+  );
+  const lastCellOfAttendanceTime = topCellOfAttendanceTime.getNextDataCell(
+    SpreadsheetApp.Direction.DOWN
+  );
+
+  // 最後の休憩時間セルを特定
+  const lastCellOfBreakingTime = lastCellOfAttendanceTime.offset(
+    0,
+    columnNumber.get("最後の休憩時間") - columnNumber.get("出勤時間")
+  );
+  const lastCellOfBreakingTimeValue = lastCellOfBreakingTime.getValue();
+  lastCellOfBreakingTimeValue.setFullYear(date.getFullYear());
+  lastCellOfBreakingTimeValue.setMonth(date.getMonth());
+  lastCellOfBreakingTimeValue.setDate(date.getDate());
+
+  Logger.log(
+    `lastCellOfBreakingTimeValue.getValue: ${lastCellOfBreakingTimeValue}`
+  );
+
+  // 最後の休憩時間が空の場合最後の休憩時間に現在時刻を記録するだけ
+  if (lastCellOfBreakingTimeValue === "") {
+    lastCellOfBreakingTime.setValue(timeString);
+  } else {
+    const lastCellOfBreakingTimeValueString = `${lastCellOfBreakingTimeValue
+      .getHours()
+      .toString()
+      .padStart(2, "0")}:${lastCellOfBreakingTimeValue
+      .getMinutes()
+      .toString()
+      .padStart(2, "0")}`;
+    Logger.log(
+      `lastCellOfBreakingTimeValueString: ${lastCellOfBreakingTimeValueString}`
+    );
+
+    // 休憩時間のセルを特定
+    const newCellOfBreakingTime = lastCellOfAttendanceTime.offset(
+      0,
+      columnNumber.get("休憩時間") - columnNumber.get("出勤時間")
+    );
+    // 休憩時間セルの値を取得
+    const newCellOfBreakingTimeValue = newCellOfBreakingTime.getValue();
+    Logger.log(`date.getTime(): ${date.getTime()}`);
+    Logger.log(
+      `lastCellOfBreakingTimeValue.getTime(): ${lastCellOfBreakingTimeValue.getTime()}`
+    );
+    Logger.log(`date.getTime(): ${date.getTime()}`);
+    // 休憩時間セルに累計休憩時間を記録し、最後の休憩時間を更新
+    newCellOfBreakingTime.setValue(
+      newCellOfBreakingTimeValue +
+        Math.floor(
+          ((date.getTime() - lastCellOfBreakingTimeValue.getTime()) /
+            (1000 * 60 * 60)) *
+            100
+        ) /
+          100
+    );
+    lastCellOfBreakingTime.setValue(timeString);
+  }
 }
