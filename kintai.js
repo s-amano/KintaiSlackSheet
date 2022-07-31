@@ -107,7 +107,8 @@ function recordLeaving(userName) {
 }
 
 function recordBreaking(userName) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(userName);
+  // const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(userName);
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("amahaya0831");
 
   // 現在時刻から日付セルと開始時刻セルに記録する文字列を生成
   const date = new Date();
@@ -121,21 +122,48 @@ function recordBreaking(userName) {
     .padStart(2, "0")}`;
   Logger.log(`timeString: ${timeString}`);
 
-  // 開始時刻が記録されている最新のセルを特定
-  const topCellOfAttendanceTime = sheet.getRange(
-    1,
-    columnNumber.get("出勤時間")
-  );
-  const lastCellOfAttendanceTime = topCellOfAttendanceTime.getNextDataCell(
+  // 日付が記録されている最新のセルを特定
+  const topCellOfDate = sheet.getRange(1, columnNumber.get("日付"));
+  Logger.log(`topCellOfDate: ${topCellOfDate.getA1Notation()}`);
+  // 指定位置の先頭行から下方向に検索して最終行を取得。
+  const lastCellOfDate = topCellOfDate.getNextDataCell(
     SpreadsheetApp.Direction.DOWN
   );
+  Logger.log(`lastCellOfDate: ${lastCellOfDate.getA1Notation()}`);
+
+// 当日の出勤時間が記録されているかチェック
+  const lastCellOfDateValue = lastCellOfDate.getValue();
+  Logger.log(`lastCellOfDate: ${lastCellOfDateValue}`);
+  if (
+    lastCellOfDateValue === "" ||
+    lastCellOfDateValue === "自動"
+  ) {
+    return;
+  }
+
+  // 出勤と休憩の日付が一致しているかチェック
+  const lastCellOfDateValueString = `${lastCellOfDateValue.getFullYear()}/${
+    lastCellOfDateValue.getMonth() + 1
+  }/${lastCellOfDateValue.getDate()}`;
+    Logger.log(`lastCellOfDateValueString: ${lastCellOfDateValueString}`);
+  if (dateString !== lastCellOfDateValueString) {
+    return;
+  }
 
   // 最後の休憩時間セルを特定
-  const lastCellOfBreakingTime = lastCellOfAttendanceTime.offset(
+  const lastCellOfBreakingTime = lastCellOfDate.offset(
     0,
-    columnNumber.get("最後の休憩時間") - columnNumber.get("出勤時間")
+    columnNumber.get("最後の休憩時間") - columnNumber.get("日付")
   );
   const lastCellOfBreakingTimeValue = lastCellOfBreakingTime.getValue();
+    Logger.log(
+    `lastCellOfBreakingTimeValue.getValue: ${lastCellOfBreakingTimeValue}`
+  );
+  // 初回の休憩
+  if (lastCellOfBreakingTimeValue === "" || lastCellOfBreakingTimeValue === "最後の休憩時間") {
+    lastCellOfBreakingTime.setValue(timeString);
+    return;
+  }
   lastCellOfBreakingTimeValue.setFullYear(date.getFullYear());
   lastCellOfBreakingTimeValue.setMonth(date.getMonth());
   lastCellOfBreakingTimeValue.setDate(date.getDate());
