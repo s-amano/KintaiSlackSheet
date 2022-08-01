@@ -26,19 +26,47 @@ const columnNumber = new Map([
   ["最後の休憩時間", 9],
 ]);
 
+// 現在時刻から日付の文字列を生成
+function createDateString(date) {
+  return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
+}
+
+// 現在時刻から時刻の文字列を生成
+function createTimeString(date) {
+  return `${date.getHours().toString().padStart(2, "0")}:${date
+    .getMinutes()
+    .toString()
+    .padStart(2, "0")}`;
+}
+
+// 「おはよう」の前の「休憩」,「再開」,「おやすみ」の打刻判定
+function isBeforeAttendance(lastCellOfDate, dateString) {
+  // 当日の出勤時間が記録されているかチェック
+  const lastCellOfDateValue = lastCellOfDate.getValue();
+  Logger.log(`lastCellOfDate: ${lastCellOfDateValue}`);
+  if (lastCellOfDateValue === "" || lastCellOfDateValue === "自動") {
+    return true;
+  }
+
+  // 出勤と退勤打刻の日付が一致しているかチェック
+  const lastCellOfDateValueString = `${lastCellOfDateValue.getFullYear()}/${
+    lastCellOfDateValue.getMonth() + 1
+  }/${lastCellOfDateValue.getDate()}`;
+  Logger.log(`lastCellOfDateValueString: ${lastCellOfDateValueString}`);
+  if (dateString !== lastCellOfDateValueString) {
+    Logger.log("退勤を打刻する前に出勤してください。");
+    return true;
+  }
+}
+
 function recordAttendance(userName) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(userName);
 
   // 現在時刻から日付セルと開始時刻セルに記録する文字列を生成
   const date = new Date();
-  const dateString = `${date.getFullYear()}/${
-    date.getMonth() + 1
-  }/${date.getDate()}`;
+  const dateString = createDateString(date);
   Logger.log(`dateString: ${dateString}`);
-  const timeString = `${date.getHours().toString().padStart(2, "0")}:${date
-    .getMinutes()
-    .toString()
-    .padStart(2, "0")}`;
+  const timeString = createTimeString(date);
   Logger.log(`timeString: ${timeString}`);
 
   // 日付が記録されている最新のセルを特定
@@ -82,64 +110,11 @@ function recordAttendance(userName) {
 function recordLeaving(userName) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(userName);
 
-  const date = new Date();
-  const dateString = `${date.getFullYear()}/${
-    date.getMonth() + 1
-  }/${date.getDate()}`;
-
-  // 日付が記録されている最新のセルを特定
-  const topCellOfDate = sheet.getRange(1, columnNumber.get("日付"));
-  Logger.log(`topCellOfDate: ${topCellOfDate.getA1Notation()}`);
-  // 指定位置の先頭行から下方向に検索して最終行を取得。
-  const lastCellOfDate = topCellOfDate.getNextDataCell(
-    SpreadsheetApp.Direction.DOWN
-  );
-  Logger.log(`lastCellOfDate: ${lastCellOfDate.getA1Notation()}`);
-
-  // 当日の出勤時間が記録されているかチェック
-  const lastCellOfDateValue = lastCellOfDate.getValue();
-  Logger.log(`lastCellOfDate: ${lastCellOfDateValue}`);
-  if (lastCellOfDateValue === "" || lastCellOfDateValue === "自動") {
-    return;
-  }
-
-  // 出勤と退勤打刻の日付が一致しているかチェック
-  const lastCellOfDateValueString = `${lastCellOfDateValue.getFullYear()}/${
-    lastCellOfDateValue.getMonth() + 1
-  }/${lastCellOfDateValue.getDate()}`;
-  Logger.log(`lastCellOfDateValueString: ${lastCellOfDateValueString}`);
-  if (dateString !== lastCellOfDateValueString) {
-    Logger.log("退勤を打刻する前に出勤してください。");
-    return;
-  }
-
-  // 終了時刻セルを特定
-  const newCellOfLeavingTime = lastCellOfDate.offset(
-    0,
-    columnNumber.get("退勤時間") - columnNumber.get("日付")
-  );
-
-  const timeString = `${date.getHours().toString().padStart(2, "0")}:${date
-    .getMinutes()
-    .toString()
-    .padStart(2, "0")}`;
-
-  newCellOfLeavingTime.setValue(timeString);
-}
-
-function recordBreaking(userName) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(userName);
-
   // 現在時刻から日付セルと開始時刻セルに記録する文字列を生成
   const date = new Date();
-  const dateString = `${date.getFullYear()}/${
-    date.getMonth() + 1
-  }/${date.getDate()}`;
+  const dateString = createDateString(date);
   Logger.log(`dateString: ${dateString}`);
-  const timeString = `${date.getHours().toString().padStart(2, "0")}:${date
-    .getMinutes()
-    .toString()
-    .padStart(2, "0")}`;
+  const timeString = createTimeString(date);
   Logger.log(`timeString: ${timeString}`);
 
   // 日付が記録されている最新のセルを特定
@@ -151,20 +126,41 @@ function recordBreaking(userName) {
   );
   Logger.log(`lastCellOfDate: ${lastCellOfDate.getA1Notation()}`);
 
-  // 当日の出勤時間が記録されているかチェック
-  const lastCellOfDateValue = lastCellOfDate.getValue();
-  Logger.log(`lastCellOfDate: ${lastCellOfDateValue}`);
-  if (lastCellOfDateValue === "" || lastCellOfDateValue === "自動") {
+  // 「おはよう」の前に「おやすみ」が打刻されているかチェック
+  if (isBeforeAttendance(lastCellOfDate, dateString)) {
     return;
   }
 
-  // 出勤と休憩の日付が一致しているかチェック
-  const lastCellOfDateValueString = `${lastCellOfDateValue.getFullYear()}/${
-    lastCellOfDateValue.getMonth() + 1
-  }/${lastCellOfDateValue.getDate()}`;
-  Logger.log(`lastCellOfDateValueString: ${lastCellOfDateValueString}`);
-  if (dateString !== lastCellOfDateValueString) {
-    Logger.log("休憩を打刻する前に出勤してください。");
+  // 終了時刻セルを特定
+  const newCellOfLeavingTime = lastCellOfDate.offset(
+    0,
+    columnNumber.get("退勤時間") - columnNumber.get("日付")
+  );
+
+  newCellOfLeavingTime.setValue(timeString);
+}
+
+function recordBreaking(userName) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(userName);
+
+  // 現在時刻から日付セルと開始時刻セルに記録する文字列を生成
+  const date = new Date();
+  const dateString = createDateString(date);
+  Logger.log(`dateString: ${dateString}`);
+  const timeString = createTimeString(date);
+  Logger.log(`timeString: ${timeString}`);
+
+  // 日付が記録されている最新のセルを特定
+  const topCellOfDate = sheet.getRange(1, columnNumber.get("日付"));
+  Logger.log(`topCellOfDate: ${topCellOfDate.getA1Notation()}`);
+  // 指定位置の先頭行から下方向に検索して最終行を取得。
+  const lastCellOfDate = topCellOfDate.getNextDataCell(
+    SpreadsheetApp.Direction.DOWN
+  );
+  Logger.log(`lastCellOfDate: ${lastCellOfDate.getA1Notation()}`);
+
+  // 「おはよう」の前に「休憩」が打刻されているかチェック
+  if (isBeforeAttendance(lastCellOfDate, dateString)) {
     return;
   }
 
@@ -201,14 +197,9 @@ function recordResuming(userName) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(userName);
   // 現在時刻から日付セルと開始時刻セルに記録する文字列を生成
   const date = new Date();
-  const dateString = `${date.getFullYear()}/${
-    date.getMonth() + 1
-  }/${date.getDate()}`;
+  const dateString = createDateString(date);
   Logger.log(`dateString: ${dateString}`);
-  const timeString = `${date.getHours().toString().padStart(2, "0")}:${date
-    .getMinutes()
-    .toString()
-    .padStart(2, "0")}`;
+  const timeString = createTimeString(date);
   Logger.log(`timeString: ${timeString}`);
 
   // 日付が記録されている最新のセルを特定
@@ -220,20 +211,8 @@ function recordResuming(userName) {
   );
   Logger.log(`lastCellOfDate: ${lastCellOfDate.getA1Notation()}`);
 
-  // 当日の出勤時間が記録されているかチェック
-  const lastCellOfDateValue = lastCellOfDate.getValue();
-  Logger.log(`lastCellOfDate: ${lastCellOfDateValue}`);
-  if (lastCellOfDateValue === "" || lastCellOfDateValue === "自動") {
-    return;
-  }
-
-  // 出勤と休憩の日付が一致しているかチェック
-  const lastCellOfDateValueString = `${lastCellOfDateValue.getFullYear()}/${
-    lastCellOfDateValue.getMonth() + 1
-  }/${lastCellOfDateValue.getDate()}`;
-  Logger.log(`lastCellOfDateValueString: ${lastCellOfDateValueString}`);
-  if (dateString !== lastCellOfDateValueString) {
-    Logger.log("再開を打刻する前に出勤してください。");
+  // 「おはよう」の前に「再開」が打刻されているかチェック
+  if (isBeforeAttendance(lastCellOfDate, dateString)) {
     return;
   }
 
@@ -257,13 +236,9 @@ function recordResuming(userName) {
     `lastCellOfBreakingTimeValue.getValue: ${lastCellOfBreakingTimeValue}`
   );
 
-  const lastCellOfBreakingTimeValueString = `${lastCellOfBreakingTimeValue
-    .getHours()
-    .toString()
-    .padStart(2, "0")}:${lastCellOfBreakingTimeValue
-    .getMinutes()
-    .toString()
-    .padStart(2, "0")}`;
+  const lastCellOfBreakingTimeValueString = createTimeString(
+    lastCellOfBreakingTimeValue
+  );
   Logger.log(
     `lastCellOfBreakingTimeValueString: ${lastCellOfBreakingTimeValueString}`
   );
